@@ -1,12 +1,7 @@
 {
   "version": 2,
-  "name": "novaedge-relay",
   "trailingSlash": false,
   "rewrites": [
-    {
-      "source": "/api/status",
-      "destination": "/api/status"
-    },
     {
       "source": "/",
       "destination": "/index.html"
@@ -26,14 +21,6 @@
     {
       "source": "/contact",
       "destination": "/index.html"
-    },
-    {
-      "source": "/assets/:path*",
-      "destination": "/assets/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api/index"
     }
   ]
 }
