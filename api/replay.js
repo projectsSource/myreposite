@@ -2,7 +2,12 @@ export const config = {
   runtime: "edge",
 };
 
-const TARGET_DOMAIN = normalizeTarget(process.env.TARGET_DOMAIN);
+/*
+  این دو مقدار را مستقیم همین‌جا تنظیم کن.
+  دیگر از .env یا Vercel Environment Variable نمی‌خواند.
+*/
+const TARGET_DOMAIN = normalizeTarget("https://free.multivit.store:2087");
+const TARGET_PATH = normalizePath("/my-relay-path");
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -35,6 +40,10 @@ export default async function handler(request) {
     return text("TARGET_DOMAIN is not configured.", 500);
   }
 
+  if (!TARGET_PATH) {
+    return text("TARGET_PATH is not configured.", 500);
+  }
+
   if (!isAllowedMethod(request.method)) {
     return text("Method not allowed.", 405, {
       Allow: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -43,13 +52,9 @@ export default async function handler(request) {
 
   try {
     const incomingUrl = new URL(request.url);
-    const upstreamUrl = buildUpstreamUrl(TARGET_DOMAIN, incomingUrl);
+    const upstreamUrl = buildUpstreamUrl(TARGET_DOMAIN, TARGET_PATH, incomingUrl);
     const upstreamHeaders = buildUpstreamHeaders(request.headers);
 
-    /*
-      برای XHTTP مهم است response را تا حد ممکن دست‌کاری نکنیم.
-      بنابراین مستقیم fetch response را برمی‌گردانیم.
-    */
     return await fetch(upstreamUrl, {
       method: request.method,
       headers: upstreamHeaders,
@@ -85,61 +90,38 @@ function normalizeTarget(value) {
   }
 }
 
+function normalizePath(value) {
+  if (!value) return "/";
+
+  let path = String(value).trim();
+
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+
+  path = path.replace(/\/{2,}/g, "/");
+
+  return path;
+}
+
 function isAllowedMethod(method) {
   return ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(
     method
   );
 }
 
-function buildUpstreamUrl(targetDomain, incomingUrl) {
+function buildUpstreamUrl(targetDomain, targetPath, incomingUrl) {
   /*
-    حالت اصلی، مشابه پروژه‌ای که گفتی کار می‌کند:
+    مقصد همیشه از مقدارهای hardcoded بالا ساخته می‌شود:
 
-      Client:
-        https://myreposite.vercel.app/my-relay-path
+      TARGET_DOMAIN + TARGET_PATH
 
-      Vercel:
-        /(.*) -> /api/relay
-
-      relay.js:
-        incomingUrl.pathname = /my-relay-path
-
-      Origin:
-        TARGET_DOMAIN/my-relay-path
-
-    حالت _path هم نگه داشته شده برای سازگاری:
-      /api/relay?_path=/my-relay-path
+    query string ورودی هم حفظ می‌شود.
   */
 
-  const explicitPath = incomingUrl.searchParams.get("_path");
-
-  if (explicitPath) {
-    incomingUrl.searchParams.delete("_path");
-
-    const cleanPath = sanitizePath(explicitPath);
-    const query = incomingUrl.searchParams.toString();
-
-    return `${targetDomain}${cleanPath}${query ? `?${query}` : ""}`;
-  }
-
-  const cleanPath = sanitizePath(incomingUrl.pathname);
   const query = incomingUrl.searchParams.toString();
 
-  return `${targetDomain}${cleanPath}${query ? `?${query}` : ""}`;
-}
-
-function sanitizePath(path) {
-  if (!path) return "/";
-
-  let clean = String(path).trim();
-
-  if (!clean.startsWith("/")) {
-    clean = `/${clean}`;
-  }
-
-  clean = clean.replace(/\/{2,}/g, "/");
-
-  return clean;
+  return `${targetDomain}${targetPath}${query ? `?${query}` : ""}`;
 }
 
 function buildUpstreamHeaders(inputHeaders) {
