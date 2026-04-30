@@ -1,0 +1,15 @@
+{
+  "name": "novaedge-vercel-service",
+  "version": "1.2.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "A complete Vercel static website with an edge HTTP relay endpoint.",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
