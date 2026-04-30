@@ -8,6 +8,14 @@
       "destination": "/api/status"
     },
     {
+      "source": "/my-relay-path",
+      "destination": "/api/relay"
+    },
+    {
+      "source": "/my-relay-path/:path*",
+      "destination": "/api/relay"
+    },
+    {
       "source": "/",
       "destination": "/index.html"
     },
@@ -26,6 +34,10 @@
     {
       "source": "/contact",
       "destination": "/index.html"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "/assets/:path*"
     },
     {
       "source": "/(.*)",
