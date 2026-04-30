@@ -8,6 +8,10 @@
       "destination": "/api/status"
     },
     {
+      "source": "/api/relay",
+      "destination": "/api/relay"
+    },
+    {
       "source": "/my-relay-path",
       "destination": "/api/relay"
     },
