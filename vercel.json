@@ -38,10 +38,6 @@
     {
       "source": "/assets/:path*",
       "destination": "/assets/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api/relay"
     }
   ]
 }
