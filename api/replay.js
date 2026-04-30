@@ -32,26 +32,13 @@ const NO_BODY_METHODS = new Set(["GET", "HEAD"]);
 
 export default async function handler(request) {
   if (!TARGET_DOMAIN) {
-    return json(
-      {
-        ok: false,
-        error: "TARGET_DOMAIN is not configured.",
-      },
-      500
-    );
+    return text("TARGET_DOMAIN is not configured.", 500);
   }
 
   if (!isAllowedMethod(request.method)) {
-    return json(
-      {
-        ok: false,
-        error: "Method not allowed.",
-      },
-      405,
-      {
-        Allow: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
-      }
-    );
+    return text("Method not allowed.", 405, {
+      Allow: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
+    });
   }
 
   try {
@@ -59,27 +46,19 @@ export default async function handler(request) {
     const upstreamUrl = buildUpstreamUrl(TARGET_DOMAIN, incomingUrl);
     const upstreamHeaders = buildUpstreamHeaders(request.headers);
 
-    const upstreamResponse = await fetch(upstreamUrl, {
+    return await fetch(upstreamUrl, {
       method: request.method,
       headers: upstreamHeaders,
       body: NO_BODY_METHODS.has(request.method) ? undefined : request.body,
       redirect: "manual",
       duplex: "half",
     });
-
-    return buildClientResponse(upstreamResponse);
   } catch (error) {
     console.error("relay_error", {
       message: error?.message || String(error),
     });
 
-    return json(
-      {
-        ok: false,
-        error: "Bad gateway.",
-      },
-      502
-    );
+    return text("Bad Gateway: Tunnel Failed", 502);
   }
 }
 
@@ -109,10 +88,30 @@ function isAllowedMethod(method) {
 }
 
 function buildUpstreamUrl(targetDomain, incomingUrl) {
-  const relayPath = incomingUrl.searchParams.get("_path") || "/";
-  incomingUrl.searchParams.delete("_path");
+  /*
+    دو حالت را پشتیبانی می‌کند:
 
-  const cleanPath = sanitizePath(relayPath);
+    حالت ۱ - مدل قدیمی/کارکرده:
+      Client: /my-relay-path
+      Origin: TARGET_DOMAIN/my-relay-path
+
+    حالت ۲ - مدل _path:
+      Client: /api/relay?_path=/my-relay-path
+      Origin: TARGET_DOMAIN/my-relay-path
+  */
+
+  const explicitPath = incomingUrl.searchParams.get("_path");
+
+  if (explicitPath) {
+    incomingUrl.searchParams.delete("_path");
+
+    const cleanPath = sanitizePath(explicitPath);
+    const query = incomingUrl.searchParams.toString();
+
+    return `${targetDomain}${cleanPath}${query ? `?${query}` : ""}`;
+  }
+
+  const cleanPath = sanitizePath(incomingUrl.pathname);
   const query = incomingUrl.searchParams.toString();
 
   return `${targetDomain}${cleanPath}${query ? `?${query}` : ""}`;
@@ -134,6 +133,7 @@ function sanitizePath(path) {
 
 function buildUpstreamHeaders(inputHeaders) {
   const output = new Headers();
+  let clientIp = "";
 
   for (const [key, value] of inputHeaders.entries()) {
     const lowerKey = key.toLowerCase();
@@ -143,33 +143,33 @@ function buildUpstreamHeaders(inputHeaders) {
     if (lowerKey.startsWith("x-vercel-")) continue;
     if (lowerKey.startsWith("x-now-")) continue;
 
+    if (lowerKey === "x-real-ip") {
+      clientIp = value;
+      continue;
+    }
+
+    if (lowerKey === "x-forwarded-for") {
+      if (!clientIp) {
+        clientIp = value.split(",")[0].trim();
+      }
+      continue;
+    }
+
     output.set(key, value);
+  }
+
+  if (clientIp) {
+    output.set("x-forwarded-for", clientIp);
   }
 
   return output;
 }
 
-function buildClientResponse(upstreamResponse) {
-  const headers = new Headers(upstreamResponse.headers);
-
-  for (const header of HOP_BY_HOP_HEADERS) {
-    headers.delete(header);
-  }
-
-  headers.set("x-content-type-options", "nosniff");
-
-  return new Response(upstreamResponse.body, {
-    status: upstreamResponse.status,
-    statusText: upstreamResponse.statusText,
-    headers,
-  });
-}
-
-function json(payload, status = 200, headers = {}) {
-  return new Response(JSON.stringify(payload), {
+function text(body, status = 200, headers = {}) {
+  return new Response(body, {
     status,
     headers: {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
       ...headers,
     },
