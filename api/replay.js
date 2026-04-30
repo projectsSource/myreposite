@@ -46,6 +46,10 @@ export default async function handler(request) {
     const upstreamUrl = buildUpstreamUrl(TARGET_DOMAIN, incomingUrl);
     const upstreamHeaders = buildUpstreamHeaders(request.headers);
 
+    /*
+      برای XHTTP مهم است response را تا حد ممکن دست‌کاری نکنیم.
+      بنابراین مستقیم fetch response را برمی‌گردانیم.
+    */
     return await fetch(upstreamUrl, {
       method: request.method,
       headers: upstreamHeaders,
@@ -89,15 +93,22 @@ function isAllowedMethod(method) {
 
 function buildUpstreamUrl(targetDomain, incomingUrl) {
   /*
-    دو حالت را پشتیبانی می‌کند:
+    حالت اصلی، مشابه پروژه‌ای که گفتی کار می‌کند:
 
-    حالت ۱ - مدل قدیمی/کارکرده:
-      Client: /my-relay-path
-      Origin: TARGET_DOMAIN/my-relay-path
+      Client:
+        https://myreposite.vercel.app/my-relay-path
 
-    حالت ۲ - مدل _path:
-      Client: /api/relay?_path=/my-relay-path
-      Origin: TARGET_DOMAIN/my-relay-path
+      Vercel:
+        /(.*) -> /api/relay
+
+      relay.js:
+        incomingUrl.pathname = /my-relay-path
+
+      Origin:
+        TARGET_DOMAIN/my-relay-path
+
+    حالت _path هم نگه داشته شده برای سازگاری:
+      /api/relay?_path=/my-relay-path
   */
 
   const explicitPath = incomingUrl.searchParams.get("_path");
