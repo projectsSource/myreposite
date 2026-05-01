@@ -35,11 +35,11 @@ export default async function handler(request) {
   try {
     const pathStart = req.url.indexOf("/", 8);
     const targetUrl =
-      pathStart === -1 ? MY_Target + "/" : MY_Target + req.url.slice(pathStart);
+      pathStart === -1 ? MY_Target + "/" : MY_Target + request.url.slice(pathStart);
 
     const out = new Headers();
     let clientIp = null;
-    for (const [k, v] of req.headers) {
+    for (const [k, v] of request.headers) {
       if (HOP_BY_HOP_HEADERS.has(k)) continue;
       if (k.startsWith("x-vercel-")) continue;
       if (k === "x-real-ip") {
@@ -54,13 +54,13 @@ export default async function handler(request) {
     }
     if (clientIp) out.set("x-forwarded-for", clientIp);
 
-    const method = req.method;
+    const method = request.method;
     const hasBody = method !== "GET" && method !== "HEAD";
 
     return await fetch(targetUrl, {
       method,
       headers: out,
-      body: hasBody ? req.body : undefined,
+      body: hasBody ? request.body : undefined,
       duplex: "half",
       redirect: "manual",
     });
