@@ -32,17 +32,10 @@ export default async function handler(request) {
     return text("MY_Target is not configured.", 500);
   }
 
-  if (!isAllowedMethod(request.method)) {
-    return text("Method not allowed.", 405, {
-      Allow: "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
-    });
-  }
-
   try {
- try {
     const pathStart = req.url.indexOf("/", 8);
     const targetUrl =
-      pathStart === -1 ? MY_Target + "/" : MY_Target + req.url.slice(pathStart);
+      pathStart === -1 ? TARGET_BASE + "/" : TARGET_BASE + req.url.slice(pathStart);
 
     const out = new Headers();
     let clientIp = null;
