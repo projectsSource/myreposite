@@ -65,7 +65,15 @@ export default async function handler(request) {
       redirect: "manual",
     });
   } catch (err) {
-    console.error("relay error:", err);
-    return new Response("Bad Gateway: Tunnel Failed", { status: 502 });
+    return new Response(
+      "Bad Gateway: " + (err?.message || String(err)),
+      {
+        status: 502,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store"
+        }
+      }
+    );
   }
 }
