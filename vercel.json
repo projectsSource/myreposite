@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "name": "novaedge-relay",
+   "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }, {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/services",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/platform",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "/assets/:path*"
+    }
+  ],
+  "trailingSlash": false
+ 
+   
+}
