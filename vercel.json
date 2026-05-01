@@ -1,9 +1,8 @@
 {
   "version": 2,
   "name": "novaedge-relay",
-   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" } ]
-  "trailingSlash": false
- 
-   
+    "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ],
+  "trailingSlash": false   
 }
