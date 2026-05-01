@@ -33,7 +33,7 @@ export default async function handler(request) {
   }
 
   try {
-    const pathStart = req.url.indexOf("/", 8);
+    const pathStart = request.url.indexOf("/", 8);
     const targetUrl =
       pathStart === -1 ? MY_Target + "/" : MY_Target + request.url.slice(pathStart);
 
