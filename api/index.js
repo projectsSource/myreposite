@@ -6,9 +6,10 @@ export const config = {
   مقصد مستقیم داخل کد است.
   دیگر از .env یا Vercel Environment Variable نمی‌خواند.
 */
-const TARGET_DOMAIN = normalizeTarget("https://free.multivit.store:2087");
+const MY_Target = (process.env.TARGET_DOMAIN || "").replace(/\/$/, "");
 
 const HOP_BY_HOP_HEADERS = new Set([
+   "host",
   "connection",
   "keep-alive",
   "proxy-authenticate",
@@ -17,26 +18,18 @@ const HOP_BY_HOP_HEADERS = new Set([
   "trailer",
   "transfer-encoding",
   "upgrade",
-]);
-
-const BLOCKED_REQUEST_HEADERS = new Set([
-  "host",
   "forwarded",
   "x-forwarded-host",
   "x-forwarded-proto",
   "x-forwarded-port",
-  "x-vercel-id",
-  "x-vercel-forwarded-for",
-  "x-matched-path",
-  "x-now-id",
-  "x-now-route-matches",
 ]);
 
-const NO_BODY_METHODS = new Set(["GET", "HEAD"]);
+ 
+//const NO_BODY_METHODS = new Set(["GET", "HEAD"]);
 
 export default async function handler(request) {
-  if (!TARGET_DOMAIN) {
-    return text("TARGET_DOMAIN is not configured.", 500);
+  if (!MY_Target) {
+    return text("MY_Target is not configured.", 500);
   }
 
   if (!isAllowedMethod(request.method)) {
@@ -46,126 +39,40 @@ export default async function handler(request) {
   }
 
   try {
-    const incomingUrl = new URL(request.url);
-    const upstreamUrl = buildUpstreamUrl(TARGET_DOMAIN, incomingUrl);
-    const upstreamHeaders = buildUpstreamHeaders(request.headers);
+ try {
+    const pathStart = req.url.indexOf("/", 8);
+    const targetUrl =
+      pathStart === -1 ? MY_Target + "/" : MY_Target + req.url.slice(pathStart);
 
-    return await fetch(upstreamUrl, {
-      method: request.method,
-      headers: upstreamHeaders,
-      body: NO_BODY_METHODS.has(request.method) ? undefined : request.body,
-      redirect: "manual",
-      duplex: "half",
-    });
-  } catch (error) {
-    console.error("relay_error", {
-      message: error?.message || String(error),
-    });
-
-    return text("Bad Gateway: Tunnel Failed", 502);
-  }
-}
-
-function normalizeTarget(value) {
-  if (!value) return "";
-
-  try {
-    const url = new URL(value.trim());
-
-    if (!["http:", "https:"].includes(url.protocol)) {
-      return "";
-    }
-
-    url.hash = "";
-    url.search = "";
-
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
-function isAllowedMethod(method) {
-  return ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(
-    method
-  );
-}
-
-function buildUpstreamUrl(targetDomain, incomingUrl) {
-  /*
-    مدل اصلی پروژه کارکرده:
-
-      Client:
-        /my-relay-path
-
-      Vercel:
-        /(.*) -> /api/index
-
-      Origin:
-        https://free.multivit.store:2087/my-relay-path
-  */
-
-  const path = sanitizePath(incomingUrl.pathname);
-  const query = incomingUrl.searchParams.toString();
-
-  return `${targetDomain}${path}${query ? `?${query}` : ""}`;
-}
-
-function sanitizePath(path) {
-  if (!path) return "/";
-
-  let clean = String(path).trim();
-
-  if (!clean.startsWith("/")) {
-    clean = `/${clean}`;
-  }
-
-  clean = clean.replace(/\/{2,}/g, "/");
-
-  return clean;
-}
-
-function buildUpstreamHeaders(inputHeaders) {
-  const output = new Headers();
-  let clientIp = "";
-
-  for (const [key, value] of inputHeaders.entries()) {
-    const lowerKey = key.toLowerCase();
-
-    if (HOP_BY_HOP_HEADERS.has(lowerKey)) continue;
-    if (BLOCKED_REQUEST_HEADERS.has(lowerKey)) continue;
-    if (lowerKey.startsWith("x-vercel-")) continue;
-    if (lowerKey.startsWith("x-now-")) continue;
-
-    if (lowerKey === "x-real-ip") {
-      clientIp = value;
-      continue;
-    }
-
-    if (lowerKey === "x-forwarded-for") {
-      if (!clientIp) {
-        clientIp = value.split(",")[0].trim();
+    const out = new Headers();
+    let clientIp = null;
+    for (const [k, v] of req.headers) {
+      if (HOP_BY_HOP_HEADERS.has(k)) continue;
+      if (k.startsWith("x-vercel-")) continue;
+      if (k === "x-real-ip") {
+        clientIp = v;
+        continue;
       }
-      continue;
+      if (k === "x-forwarded-for") {
+        if (!clientIp) clientIp = v;
+        continue;
+      }
+      out.set(k, v);
     }
+    if (clientIp) out.set("x-forwarded-for", clientIp);
 
-    output.set(key, value);
+    const method = req.method;
+    const hasBody = method !== "GET" && method !== "HEAD";
+
+    return await fetch(targetUrl, {
+      method,
+      headers: out,
+      body: hasBody ? req.body : undefined,
+      duplex: "half",
+      redirect: "manual",
+    });
+  } catch (err) {
+    console.error("relay error:", err);
+    return new Response("Bad Gateway: Tunnel Failed", { status: 502 });
   }
-
-  if (clientIp) {
-    output.set("x-forwarded-for", clientIp);
-  }
-
-  return output;
-}
-
-function text(body, status = 200, headers = {}) {
-  return new Response(body, {
-    status,
-    headers: {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-      ...headers,
-    },
-  });
 }
